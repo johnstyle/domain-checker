@@ -13,11 +13,6 @@ def header():
         'RealDomain',
         'SubjectCN',
         'SubjectAltName',
-        'HttpsEnabled',
-        'HttpsValid',
-        'HttpsTrueHost',
-        'HttpsValidDate',
-        'HttpsRedirection',
         'CreatedAt',
         'ExpireAt',
         'IssuerO',
@@ -29,23 +24,50 @@ def header():
         'Version',
         'KeyBits',
         'KeyType',
-        'SerialNumber'
+        'SerialNumber',
+        'HttpsEnabled',
+        'HttpsValid',
+        'HttpsTrueHost',
+        'HttpsValidDate',
+        'HttpsRedirection',
+        'HttpsError'
     ]
 
 
 def check(domain):
     print(domain)
 
-    http_url = requests.head('http://' + domain, timeout=5, allow_redirects=True).url
-    https_url = requests.head('https://' + domain, timeout=5, allow_redirects=True).url
-    http_uri = urlparse(http_url)
-    https_uri = urlparse(https_url)
-
-    real_domain = https_uri.netloc
-    https_enabled = 'https' == https_uri.scheme
+    real_domain = ''
     subject_alt_name = ''
+    created_at = ''
+    expire_at = ''
+    subject_cn = ''
+    issuer_o = ''
+    issuer_ou = ''
+    issuer_cn = ''
+    issuer_email_address = ''
+    subject_organization_name = ''
+    signature_algorithm = ''
+    version = ''
+    pubkey_bits = ''
+    pubkey_type = ''
+    serial_number = ''
+    https_enabled = 0
+    https_valid = 0
+    https_redirection = 0
+    https_true_host = 0
+    https_valid_date = 0
+    https_error = ''
 
     try:
+        http_url = requests.head('http://' + domain, timeout=15, allow_redirects=True).url
+        https_url = requests.head('https://' + domain, timeout=15, allow_redirects=True).url
+        http_uri = urlparse(http_url)
+        https_uri = urlparse(https_url)
+
+        real_domain = https_uri.netloc
+        https_enabled = 'https' == https_uri.scheme
+
         conn = ssl.create_connection((real_domain, 443))
         context = ssl.SSLContext(ssl.PROTOCOL_SSLv23)
         sock = context.wrap_socket(conn, server_hostname=real_domain)
@@ -79,36 +101,26 @@ def check(domain):
         https_valid_date = not x509.has_expired()
         serial_number = x509.get_serial_number()
 
-    except socket.error:
-        https_enabled = 0
-        https_valid = 0
-        https_redirection = 0
-        https_true_host = 0
-        https_valid_date = 0
-        created_at = ''
-        expire_at = ''
-        subject_cn = ''
-        issuer_o = ''
-        issuer_ou = ''
-        issuer_cn = ''
-        issuer_email_address = ''
-        subject_organization_name = ''
-        signature_algorithm = ''
-        version = ''
-        pubkey_bits = ''
-        pubkey_type = ''
-        serial_number = ''
+    except requests.exceptions.RequestException as error:
+        https_error = error.message
+
+    except ssl.SSLError as error:
+        https_error = error.message
+
+    except OpenSSL.crypto.Error as error:
+        https_error = error.message
+
+    except socket.error as error:
+        https_error = error.message
+
+    except requests.packages.urllib3.exceptions.LocationValueError as error:
+        https_error = error.message
 
     return [
         str(domain),
         str(real_domain),
         str(subject_cn),
         str(subject_alt_name),
-        int(https_enabled),
-        int(https_valid),
-        int(https_true_host),
-        int(https_valid_date),
-        int(https_redirection),
         str(created_at),
         str(expire_at),
         str(issuer_o),
@@ -120,5 +132,11 @@ def check(domain):
         str(version),
         str(pubkey_bits),
         str(pubkey_type),
-        str(serial_number)
+        str(serial_number),
+        int(https_enabled),
+        int(https_valid),
+        int(https_true_host),
+        int(https_valid_date),
+        int(https_redirection),
+        str(https_error)
     ]
